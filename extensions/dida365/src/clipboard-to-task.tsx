@@ -1,0 +1,185 @@
+import {
+  Action,
+  ActionPanel,
+  Clipboard,
+  Form,
+  showToast,
+  Toast,
+  useNavigation,
+} from "@raycast/api";
+import { useEffect, useMemo, useState } from "react";
+import { createTask, describeApiError, listProjects } from "./api/dida365.js";
+import { SetupTokenView } from "./components/setup-token-view.js";
+import { isMissingApiToken } from "./setup.js";
+import type { Project, TaskPriority } from "./types.js";
+import {
+  parseSmartDate,
+  stripSmartDateText,
+  toTaskDatePayload,
+} from "./utils/smart-date.js";
+
+type Values = {
+  tasksText: string;
+  projectId?: string;
+  priority: string;
+};
+
+type ParsedClipboardTask = {
+  title: string;
+  source: string;
+  dueDate?: string;
+  isAllDay?: boolean;
+};
+
+export default function Command() {
+  const { pop } = useNavigation();
+  const [clipboardText, setClipboardText] = useState("");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [needsSetup, setNeedsSetup] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      setIsLoading(true);
+      try {
+        const [text, loadedProjects] = await Promise.all([
+          Clipboard.readText(),
+          listProjects(),
+        ]);
+        setClipboardText(text ?? "");
+        setProjects(loadedProjects);
+      } catch (error) {
+        if (isMissingApiToken(error)) {
+          setNeedsSetup(true);
+          return;
+        }
+
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "Failed to load clipboard",
+          message: describeApiError(error),
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void load();
+  }, []);
+
+  const preview = useMemo(
+    () => parseClipboardTasks(clipboardText),
+    [clipboardText],
+  );
+
+  if (needsSetup) {
+    return <SetupTokenView />;
+  }
+
+  async function handleSubmit(values: Values) {
+    const parsedTasks = parseClipboardTasks(values.tasksText);
+
+    if (parsedTasks.length === 0) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "No tasks found",
+      });
+      return;
+    }
+
+    const toast = await showToast({
+      style: Toast.Style.Animated,
+      title: `Creating ${parsedTasks.length} task${parsedTasks.length > 1 ? "s" : ""}...`,
+    });
+
+    try {
+      await Promise.all(
+        parsedTasks.map((task) =>
+          createTask({
+            title: task.title,
+            projectId: values.projectId || undefined,
+            content: task.source,
+            dueDate: task.dueDate,
+            isAllDay: task.isAllDay,
+            priority: Number(values.priority) as TaskPriority,
+            timeZone: "Asia/Shanghai",
+          }),
+        ),
+      );
+
+      toast.style = Toast.Style.Success;
+      toast.title = `Created ${parsedTasks.length} task${parsedTasks.length > 1 ? "s" : ""}`;
+      pop();
+    } catch (error) {
+      toast.style = Toast.Style.Failure;
+      toast.title = "Failed to create tasks";
+      toast.message = describeApiError(error);
+    }
+  }
+
+  return (
+    <Form
+      isLoading={isLoading}
+      actions={
+        <ActionPanel>
+          <Action.SubmitForm title="Create Tasks" onSubmit={handleSubmit} />
+        </ActionPanel>
+      }
+    >
+      <Form.TextArea
+        id="tasksText"
+        title="Clipboard Tasks"
+        defaultValue={clipboardText}
+        placeholder="One task per line. Example: 明天上午9点 提交报告"
+      />
+
+      <Form.Description
+        title="Preview"
+        text={preview
+          .slice(0, 8)
+          .map(
+            (task) =>
+              `• ${task.title}${task.dueDate ? ` · ${task.dueDate}` : ""}`,
+          )
+          .join("\n")}
+      />
+
+      <Form.Dropdown id="projectId" title="List">
+        <Form.Dropdown.Item value="" title="Default / Inbox" />
+        {projects.map((project) => (
+          <Form.Dropdown.Item
+            key={project.id}
+            value={project.id}
+            title={project.name}
+          />
+        ))}
+      </Form.Dropdown>
+
+      <Form.Dropdown id="priority" title="Priority" defaultValue="0">
+        <Form.Dropdown.Item value="0" title="None" />
+        <Form.Dropdown.Item value="1" title="Low" />
+        <Form.Dropdown.Item value="3" title="Medium" />
+        <Form.Dropdown.Item value="5" title="High" />
+      </Form.Dropdown>
+    </Form>
+  );
+}
+
+function parseClipboardTasks(text: string): ParsedClipboardTask[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[-*•\d.)\s]+/, "").trim())
+    .filter(Boolean)
+    .map((source) => {
+      const smartDate = parseSmartDate(source);
+      const payload = toTaskDatePayload(smartDate);
+      const title = stripSmartDateText(source, smartDate) || source;
+
+      return {
+        title: title.slice(0, 220),
+        source,
+        dueDate: payload.dueDate,
+        isAllDay: payload.isAllDay,
+      };
+    });
+}
