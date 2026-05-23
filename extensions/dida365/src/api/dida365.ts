@@ -16,7 +16,7 @@ class Dida365Error extends Error {
 }
 
 function preferences() {
-  const values = getPreferenceValues<{ apiToken?: string }>();
+  const values = getPreferenceValues<Preferences>();
   return {
     apiToken: values.apiToken?.trim(),
   };

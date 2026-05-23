@@ -49,10 +49,6 @@ export default function Command() {
     }
   }
 
-  if (needsSetup) {
-    return <SetupTokenView />;
-  }
-
   useEffect(() => {
     void loadTasks();
   }, []);
@@ -86,6 +82,10 @@ export default function Command() {
       toast.title = "Failed to complete task";
       toast.message = describeApiError(error);
     }
+  }
+
+  if (needsSetup) {
+    return <SetupTokenView />;
   }
 
   return (

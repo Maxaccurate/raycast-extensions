@@ -1,7 +1,3 @@
-export type Preferences = {
-  apiToken?: string;
-};
-
 export type Project = {
   id: string;
   name: string;
