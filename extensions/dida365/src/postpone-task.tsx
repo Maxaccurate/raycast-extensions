@@ -15,6 +15,7 @@ import { isMissingApiToken } from "./setup.js";
 import type { Task } from "./types.js";
 import { dateFromPreset, toTaskDatePayload } from "./utils/smart-date.js";
 import { taskSearchText } from "./utils/task.js";
+import { systemTimeZone } from "./utils/timezone.js";
 
 type PostponePreset =
   | "today"
@@ -93,7 +94,7 @@ export default function Command() {
         ...task,
         dueDate: payload.dueDate,
         isAllDay: payload.isAllDay,
-        timeZone: "Asia/Shanghai",
+        timeZone: systemTimeZone(),
       });
       setTasks((current) =>
         current.map((item) =>

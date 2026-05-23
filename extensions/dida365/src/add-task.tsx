@@ -12,6 +12,7 @@ import { SetupTokenView } from "./components/setup-token-view.js";
 import { isMissingApiToken } from "./setup.js";
 import type { Project, TaskPriority } from "./types.js";
 import { reminderTrigger, toDidaDate } from "./utils/date.js";
+import { systemTimeZone } from "./utils/timezone.js";
 
 type Values = {
   title: string;
@@ -94,7 +95,7 @@ export default function Command() {
         projectId: values.projectId || undefined,
         content: values.content?.trim() || undefined,
         dueDate: toDidaDate(dueDate),
-        timeZone: "Asia/Shanghai",
+        timeZone: systemTimeZone(),
         isAllDay: Boolean(dueDate && !hasDueTime),
         priority: Number(values.priority) as TaskPriority,
         reminders: reminderTrigger(values.reminder),

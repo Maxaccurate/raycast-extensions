@@ -17,6 +17,7 @@ import {
   stripSmartDateText,
   toTaskDatePayload,
 } from "./utils/smart-date.js";
+import { systemTimeZone } from "./utils/timezone.js";
 
 type Values = {
   tasksText: string;
@@ -102,7 +103,7 @@ export default function Command() {
             dueDate: task.dueDate,
             isAllDay: task.isAllDay,
             priority: Number(values.priority) as TaskPriority,
-            timeZone: "Asia/Shanghai",
+            timeZone: systemTimeZone(),
           }),
         ),
       );
