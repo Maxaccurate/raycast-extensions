@@ -38,3 +38,4 @@ The token is stored locally by Raycast and is only used to call the Dida365 API.
 ## Notes
 
 This extension targets the China-region Dida365 service at `https://api.dida365.com/open/v1`.
+Due dates with times use the system time zone configured on the user's device.
