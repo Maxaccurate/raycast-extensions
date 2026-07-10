@@ -2,6 +2,8 @@
 
 Read, search, extract verification codes, and send NetEase Mail directly from Raycast.
 
+Available on macOS and Windows.
+
 ## Features
 
 - **Inbox** - Browse recent inbox or unread messages with sender, subject, date, and preview text

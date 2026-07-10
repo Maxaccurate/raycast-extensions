@@ -4,3 +4,4 @@
 
 - Initial extension.
 - Added inbox, search, verification-code extraction, compose, and template support.
+- Added macOS and Windows support with shared IMAP/SMTP connection settings.

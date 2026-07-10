@@ -1,5 +1,7 @@
-import { FetchMessageObject, ImapFlow } from "imapflow";
-import { ParsedMail, simpleParser } from "mailparser";
+import { ImapFlow } from "imapflow";
+import type { FetchMessageObject } from "imapflow";
+import { simpleParser } from "mailparser";
+import type { ParsedMail } from "mailparser";
 import nodemailer from "nodemailer";
 import { dateDaysAgo, dateMinutesAgo } from "./date.js";
 import { getMailPreferences, MissingMailCredentialsError } from "./preferences.js";
@@ -35,6 +37,17 @@ export type SendMailInput = {
   body: string;
 };
 
+const CLIENT_INFO = {
+  name: "raycast-netease-mail",
+  version: "0.1.0",
+  vendor: "Raycast Extension",
+  "support-url": "https://github.com/raycast/extensions/tree/main/extensions/netease-mail",
+};
+
+const CONNECTION_TIMEOUT = 15_000;
+const GREETING_TIMEOUT = 10_000;
+const SOCKET_TIMEOUT = 30_000;
+
 export async function fetchMail(options: FetchMailOptions = {}): Promise<MailMessage[]> {
   const preferences = getMailPreferences();
   ensureMailCredentials(preferences);
@@ -47,7 +60,6 @@ export async function fetchMail(options: FetchMailOptions = {}): Promise<MailMes
   await client.connect();
 
   try {
-    await sendClientId(client);
     const lock = await client.getMailboxLock(options.mailbox || "INBOX");
     try {
       const searchCriteria: Record<string, unknown> = {};
@@ -145,7 +157,6 @@ export async function fetchRecentMail(minutes: number, limit = 25): Promise<Mail
   await client.connect();
 
   try {
-    await sendClientId(client);
     const lock = await client.getMailboxLock("INBOX");
     try {
       const uids = await client.search({ since }, { uid: true });
@@ -188,7 +199,6 @@ export async function markMailAsRead(uid: number): Promise<void> {
   await client.connect();
 
   try {
-    await sendClientId(client);
     const lock = await client.getMailboxLock("INBOX");
     try {
       await client.messageFlagsAdd(uid, ["\\Seen"], { uid: true });
@@ -207,6 +217,14 @@ export async function sendMail(input: SendMailInput): Promise<void> {
     host: preferences.smtpHost,
     port: preferences.smtpPort,
     secure: preferences.smtpPort === 465,
+    requireTLS: preferences.smtpPort !== 465,
+    connectionTimeout: CONNECTION_TIMEOUT,
+    greetingTimeout: GREETING_TIMEOUT,
+    socketTimeout: SOCKET_TIMEOUT,
+    tls: {
+      servername: preferences.smtpHost,
+      minVersion: "TLSv1.2",
+    },
     auth: {
       user: preferences.emailAddress,
       pass: preferences.authorizationCode,
@@ -231,6 +249,16 @@ function createImapClient(): ImapFlow {
     host: preferences.imapHost,
     port: preferences.imapPort,
     secure: preferences.imapPort === 993,
+    servername: preferences.imapHost,
+    clientInfo: CLIENT_INFO,
+    disableAutoIdle: true,
+    connectionTimeout: CONNECTION_TIMEOUT,
+    greetingTimeout: GREETING_TIMEOUT,
+    socketTimeout: SOCKET_TIMEOUT,
+    tls: {
+      servername: preferences.imapHost,
+      minVersion: "TLSv1.2",
+    },
     auth: {
       user: preferences.emailAddress,
       pass: preferences.authorizationCode,
@@ -301,27 +329,6 @@ async function parseFetchedMessage(message: FetchMessageObject | false): Promise
     snippet: makeSnippet(text),
     text,
   };
-}
-
-async function sendClientId(client: ImapFlow): Promise<void> {
-  const maybeClientWithId = client as unknown as {
-    id?: unknown;
-  };
-
-  if (typeof maybeClientWithId.id !== "function") {
-    return;
-  }
-
-  const sendId = maybeClientWithId.id as (info: Record<string, string>) => Promise<unknown>;
-
-  await sendId
-    .call(client, {
-      name: "raycast-netease-mail",
-      version: "0.1.0",
-      vendor: "raycast-extension",
-      contact: "local-extension",
-    })
-    .catch(() => undefined);
 }
 
 function getParsedText(text?: string, html?: string | false): string {
